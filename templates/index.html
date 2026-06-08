@@ -48,42 +48,55 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
-    const data = await fetchAPI('/api/overview');
+    try {
+        const data = await fetchAPI('/api/overview');
 
-    // KPI
-    document.getElementById('kpi-brands').textContent = data.kpi.brands;
-    document.getElementById('kpi-products').textContent = data.kpi.products;
-    document.getElementById('kpi-reviews').textContent = data.kpi.reviews.toLocaleString();
-    document.getElementById('kpi-positive').textContent = data.kpi.positive_rate + '%';
+        // KPI
+        document.getElementById('kpi-brands').textContent = data.kpi.brands;
+        document.getElementById('kpi-products').textContent = data.kpi.products;
+        document.getElementById('kpi-reviews').textContent = data.kpi.reviews.toLocaleString();
+        document.getElementById('kpi-positive').textContent = data.kpi.positive_rate + '%';
 
-    // 情感排名
-    const top10 = data.top10;
-    createRankChart('chart-sentiment-rank',
-        top10.map(d => d['品牌']).reverse(),
-        top10.map(d => d['平均情感得分']).reverse(),
-        '情感得分', v => v > 0.95 ? '#2ecc71' : v > 0.92 ? '#f1c40f' : '#e94560');
+        const top10 = data.top10;
+        if (typeof echarts !== 'undefined') {
+            // 情感排名
+            createRankChart('chart-sentiment-rank',
+                top10.map(d => d['品牌']).reverse(),
+                top10.map(d => d['平均情感得分']).reverse(),
+                '情感得分', v => v > 0.95 ? '#2ecc71' : v > 0.92 ? '#f1c40f' : '#e94560');
 
-    // 综合竞争力
-    createRankChart('chart-competitiveness',
-        top10.map(d => d['品牌']).reverse(),
-        top10.map(d => d['综合竞争力']).reverse(),
-        '竞争力', v => v > 0.6 ? '#2ecc71' : v > 0.4 ? '#f1c40f' : '#e94560');
+            // 综合竞争力
+            createRankChart('chart-competitiveness',
+                top10.map(d => d['品牌']).reverse(),
+                top10.map(d => d['综合竞争力']).reverse(),
+                '竞争力', v => v > 0.6 ? '#2ecc71' : v > 0.4 ? '#f1c40f' : '#e94560');
 
-    // 气泡图
-    createBubbleChart('chart-bubble', data.bubble, '平均价格', '平均销量', '评论数', '平均情感得分');
+            // 气泡图
+            createBubbleChart('chart-bubble', data.bubble, '平均价格', '平均销量', '评论数', '平均情感得分');
+        } else {
+            document.querySelectorAll('.chart-container').forEach(el => {
+                el.innerHTML = '<p style="text-align:center;padding:4rem;color:#8899aa;">图表加载中，请刷新页面...</p>';
+            });
+        }
 
-    // Top 5 卡片
-    const top5 = data.top10.slice(0, 5);
-    const colors = ['#e94560','#3498db','#2ecc71','#f1c40f','#9b59b6'];
-    const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
-    const container = document.getElementById('top5-cards');
-    container.innerHTML = top5.map((d, i) => `
-        <div class="kpi-card" style="border-left: 3px solid ${colors[i]}">
-            <div class="kpi-label">${medals[i]} ${d['品牌']}</div>
-            <div class="kpi-value" style="font-size:1.5rem; color:${colors[i]}">${d['综合竞争力'].toFixed(3)}</div>
-            <div class="kpi-sub">情感${d['平均情感得分'].toFixed(3)} · 评分${d['平均评分'].toFixed(1)} · ${d['评论数']}评论</div>
-        </div>
-    `).join('');
+        // Top 5 卡片
+        const top5 = data.top10.slice(0, 5);
+        const colors = ['#e94560','#3498db','#2ecc71','#f1c40f','#9b59b6'];
+        const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+        const container = document.getElementById('top5-cards');
+        container.innerHTML = top5.map((d, i) => `
+            <div class="kpi-card" style="border-left: 3px solid ${colors[i]}">
+                <div class="kpi-label">${medals[i]} ${d['品牌']}</div>
+                <div class="kpi-value" style="font-size:1.5rem; color:${colors[i]}">${d['综合竞争力'].toFixed(3)}</div>
+                <div class="kpi-sub">情感${d['平均情感得分'].toFixed(3)} · 评分${d['平均评分'].toFixed(1)} · ${d['评论数']}评论</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Homepage error:', err);
+        document.querySelectorAll('.chart-container').forEach(el => {
+            el.innerHTML = '<p style="text-align:center;padding:4rem;color:#e94560;">⚠️ 数据加载失败，请刷新页面重试</p>';
+        });
+    }
 });
 </script>
 {% endblock %}
