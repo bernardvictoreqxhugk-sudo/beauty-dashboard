@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}主题挖掘{% endblock %}
+{% block content %}
+
+<div class="page-title">📝 主题挖掘 & 关键词</div>
+<div class="page-subtitle">LDA主题建模(6大主题) · TF-IDF品牌关键词提取 · 词云可视化</div>
+
+<!-- LDA 主题卡片 -->
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">🎯 LDA 用户讨论主题 (6个)</div>
+        <div class="panel-body">
+            <div class="topic-grid" id="topic-cards"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 品牌关键词选择器 + 热力图 -->
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">🏷️ 品牌TF-IDF关键词</div>
+        <div class="panel-body">
+            <label style="color:var(--text-secondary);margin-right:0.5rem;">选择品牌:</label>
+            <select id="brand-select" onchange="loadBrandKeywords()">
+                <option value="">— 全部品牌 —</option>
+            </select>
+            <div id="keywords-cloud" style="margin-top:1.5rem; min-height:200px;">
+                <p style="color:var(--text-muted);">👆 选择一个品牌查看其TF-IDF特征关键词</p>
+            </div>
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">📊 品牌×LDA主题热力图</div>
+        <div class="panel-body no-padding">
+            <img src="{{ url_for('static', filename='images/brand_lda_topic_heatmap.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
+        </div>
+    </div>
+</div>
+
+<!-- 词云 Tab 切换 -->
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">☁️ 评论词云可视化</div>
+        <div class="panel-body">
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchWordcloud('all', this)">全量词云</button>
+                <button class="tab-btn" onclick="switchWordcloud('positive', this)">正面词云</button>
+                <button class="tab-btn" onclick="switchWordcloud('negative', this)">非正面词云</button>
+                <button class="tab-btn" onclick="switchWordcloud('科颜氏', this)">科颜氏</button>
+                <button class="tab-btn" onclick="switchWordcloud('资生堂', this)">资生堂</button>
+                <button class="tab-btn" onclick="switchWordcloud('自然堂', this)">自然堂</button>
+                <button class="tab-btn" onclick="switchWordcloud('丸美', this)">丸美</button>
+            </div>
+            <img id="wordcloud-img" class="wordcloud-img" src="{{ url_for('static', filename='images/wordcloud_all.png') }}" alt="词云">
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TOPIC_COLORS = ['tag-blue','tag-green','tag-red','tag-teal','tag-purple','tag-blue'];
+let allBrands = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const data = await fetchAPI('/api/topics');
+    allBrands = data.brands;
+
+    // 主题卡片
+    const tc = document.getElementById('topic-cards');
+    tc.innerHTML = data.topics.map((t, i) => `
+        <div class="topic-card">
+            <h4 style="color: var(${['','','','','',''][i] || '--accent-blue'})">主题${t.id}: ${t.name}</h4>
+            <div class="topic-keywords">${t.keywords.map((k, j) =>
+                `<span class="tag ${TOPIC_COLORS[j % TOPIC_COLORS.length]}">${k}</span>`
+            ).join('')}</div>
+        </div>
+    `).join('');
+
+    // 品牌下拉
+    const sel = document.getElementById('brand-select');
+    allBrands.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o); });
+});
+
+async function loadBrandKeywords() {
+    const brand = document.getElementById('brand-select').value;
+    const cloud = document.getElementById('keywords-cloud');
+    if (!brand) { cloud.innerHTML = '<p style="color:var(--text-muted);">👆 选择一个品牌查看其TF-IDF特征关键词</p>'; return; }
+
+    const data = await fetchAPI(`/api/topics?brand=${encodeURIComponent(brand)}`);
+    const maxScore = Math.max(...data.keywords.map(k => k.score), 1);
+    cloud.innerHTML = data.keywords.map(k => {
+        const size = 0.9 + (k.score / maxScore) * 2.0;
+        const colors = ['#e94560','#3498db','#2ecc71','#f1c40f','#9b59b6','#1abc9c','#e67e22','#e74c3c'];
+        return `<span class="tag" style="font-size:${size.toFixed(1)}rem; padding:0.3rem 0.8rem; margin:0.3rem; color:${colors[Math.floor(Math.random()*colors.length)]}">${k.word}<small style="opacity:0.6;margin-left:4px;">${k.score.toFixed(1)}</small></span>`;
+    }).join('');
+}
+
+function switchWordcloud(type, btn) {
+    document.getElementById('wordcloud-img').src = `/static/images/wordcloud_${type}.png`;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+</script>
+{% endblock %}

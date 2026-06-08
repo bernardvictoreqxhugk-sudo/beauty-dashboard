@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}首页{% endblock %}
+{% block content %}
+
+<div class="page-title">📊 美妆品牌数据总览</div>
+<div class="page-subtitle">15个品牌 · 221款商品 · 7,517条评论 · 全景仪表板</div>
+
+<!-- KPI 卡片 -->
+<div class="kpi-row" id="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">品牌总数</div><div class="kpi-value kpi-accent" id="kpi-brands">--</div><div class="kpi-sub">天猫美妆</div></div>
+    <div class="kpi-card"><div class="kpi-label">商品款数</div><div class="kpi-value kpi-blue" id="kpi-products">--</div><div class="kpi-sub">去重后</div></div>
+    <div class="kpi-card"><div class="kpi-label">评论总数</div><div class="kpi-value kpi-green" id="kpi-reviews">--</div><div class="kpi-sub">用户评论</div></div>
+    <div class="kpi-card"><div class="kpi-label">正面评论占比</div><div class="kpi-value kpi-yellow" id="kpi-positive">--</div><div class="kpi-sub">整体均值</div></div>
+</div>
+
+<!-- 双图：情感排名 + 综合竞争力 -->
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">🏆 品牌情感得分排名</div>
+        <div class="panel-body"><div class="chart-container" id="chart-sentiment-rank"></div></div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">💪 品牌综合竞争力排名</div>
+        <div class="panel-body"><div class="chart-container" id="chart-competitiveness"></div></div>
+    </div>
+</div>
+
+<!-- 品牌气泡图 -->
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">🎈 品牌全景气泡图 (X=价格 · Y=销量 · 气泡大小=评论数 · 颜色=情感得分)</div>
+        <div class="panel-body"><div class="chart-container tall" id="chart-bubble"></div></div>
+    </div>
+</div>
+
+<!-- Top 5 品牌卡片 -->
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">🥇 Top 5 综合竞争力品牌</div>
+        <div class="panel-body">
+            <div class="kpi-row" id="top5-cards"></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const data = await fetchAPI('/api/overview');
+
+    // KPI
+    document.getElementById('kpi-brands').textContent = data.kpi.brands;
+    document.getElementById('kpi-products').textContent = data.kpi.products;
+    document.getElementById('kpi-reviews').textContent = data.kpi.reviews.toLocaleString();
+    document.getElementById('kpi-positive').textContent = data.kpi.positive_rate + '%';
+
+    // 情感排名
+    const top10 = data.top10;
+    createRankChart('chart-sentiment-rank',
+        top10.map(d => d['品牌']).reverse(),
+        top10.map(d => d['平均情感得分']).reverse(),
+        '情感得分', v => v > 0.95 ? '#2ecc71' : v > 0.92 ? '#f1c40f' : '#e94560');
+
+    // 综合竞争力
+    createRankChart('chart-competitiveness',
+        top10.map(d => d['品牌']).reverse(),
+        top10.map(d => d['综合竞争力']).reverse(),
+        '竞争力', v => v > 0.6 ? '#2ecc71' : v > 0.4 ? '#f1c40f' : '#e94560');
+
+    // 气泡图
+    createBubbleChart('chart-bubble', data.bubble, '平均价格', '平均销量', '评论数', '平均情感得分');
+
+    // Top 5 卡片
+    const top5 = data.top10.slice(0, 5);
+    const colors = ['#e94560','#3498db','#2ecc71','#f1c40f','#9b59b6'];
+    const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+    const container = document.getElementById('top5-cards');
+    container.innerHTML = top5.map((d, i) => `
+        <div class="kpi-card" style="border-left: 3px solid ${colors[i]}">
+            <div class="kpi-label">${medals[i]} ${d['品牌']}</div>
+            <div class="kpi-value" style="font-size:1.5rem; color:${colors[i]}">${d['综合竞争力'].toFixed(3)}</div>
+            <div class="kpi-sub">情感${d['平均情感得分'].toFixed(3)} · 评分${d['平均评分'].toFixed(1)} · ${d['评论数']}评论</div>
+        </div>
+    `).join('');
+});
+</script>
+{% endblock %}

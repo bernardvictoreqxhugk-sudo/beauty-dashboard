@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}品牌对比{% endblock %}
+{% block content %}
+
+<div class="page-title">🏷️ 品牌全景对比</div>
+<div class="page-subtitle">双品牌雷达图对比 · 特征关键词 · 综合竞争力排名</div>
+
+<!-- 双品牌对比选择器 -->
+<div class="compare-section">
+    <label style="color:var(--text-secondary);">品牌A:</label>
+    <select id="brand1-select" onchange="compareBrands()"><option value="">— 选择 —</option></select>
+    <span class="vs-text">VS</span>
+    <label style="color:var(--text-secondary);">品牌B:</label>
+    <select id="brand2-select" onchange="compareBrands()"><option value="">— 选择 —</option></select>
+    <span style="color:var(--text-muted);margin-left:1rem;font-size:0.85rem;">👆 选择两个品牌进行深度对比</span>
+</div>
+
+<!-- 双雷达图 -->
+<div class="grid-2">
+    <div class="panel"><div class="panel-header" id="radar1-title">品牌A 雷达图</div>
+        <div class="panel-body"><div class="chart-container tall" id="chart-radar1"></div></div>
+    </div>
+    <div class="panel"><div class="panel-header" id="radar2-title">品牌B 雷达图</div>
+        <div class="panel-body"><div class="chart-container tall" id="chart-radar2"></div></div>
+    </div>
+</div>
+
+<!-- 对比表 -->
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">📋 双品牌关键指标对比</div>
+        <div class="panel-body" id="compare-table">👆 选择两个品牌后显示对比数据</div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">🔑 品牌特征关键词对比</div>
+        <div class="panel-body">
+            <div class="grid-2" id="compare-keywords">
+                <div id="kw1"><p style="color:var(--text-muted);">—</p></div>
+                <div id="kw2"><p style="color:var(--text-muted);">—</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 价格销量图 + 综合排名 -->
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">💹 品牌价格 vs 销量散点图</div>
+        <div class="panel-body no-padding">
+            <img src="{{ url_for('static', filename='images/brand_price_vs_sales.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">🏆 品牌综合竞争力排名表</div>
+        <div class="panel-body" style="overflow-x:auto;">
+            <table class="data-table" id="brand-ranking-table">
+                <thead><tr>
+                    <th>排名</th><th>品牌</th><th>竞争力</th><th>情感</th><th>评分</th><th>价格</th><th>评论数</th>
+                </tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allBrandData = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const resp = await fetchAPI('/api/brands');
+    allBrandData = resp.data;
+    const brands = resp.brands;
+
+    // 填充下拉
+    [document.getElementById('brand1-select'), document.getElementById('brand2-select')].forEach(sel => {
+        brands.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o); });
+    });
+
+    // 默认选择前两名
+    if (brands.length >= 2) {
+        document.getElementById('brand1-select').value = brands[0];
+        document.getElementById('brand2-select').value = brands[brands.length - 1];
+        compareBrands();
+    }
+
+    // 排名表
+    renderRankingTable();
+});
+
+function renderRankingTable() {
+    const sorted = [...allBrandData].sort((a,b) => b['综合竞争力'] - a['综合竞争力']);
+    const tbody = document.querySelector('#brand-ranking-table tbody');
+    tbody.innerHTML = sorted.map((d, i) => `
+        <tr>
+            <td>${i+1}</td>
+            <td><strong>${d['品牌']}</strong></td>
+            <td class="${d['综合竞争力']>0.6?'green':d['综合竞争力']<0.3?'red':'highlight'}">${d['综合竞争力'].toFixed(3)}</td>
+            <td>${d['平均情感得分'].toFixed(4)}</td>
+            <td>${parseFloat(d['平均评分']).toFixed(2)}</td>
+            <td>¥${parseFloat(d['平均价格']).toFixed(0)}</td>
+            <td>${d['评论数']}</td>
+        </tr>
+    `).join('');
+}
+
+async function compareBrands() {
+    const b1 = document.getElementById('brand1-select').value;
+    const b2 = document.getElementById('brand2-select').value;
+    if (!b1 || !b2) return;
+
+    const data = await fetchAPI(`/api/brands/compare?b1=${encodeURIComponent(b1)}&b2=${encodeURIComponent(b2)}`);
+    const r1 = data.brand1, r2 = data.brand2;
+
+    // 雷达图标题
+    document.getElementById('radar1-title').textContent = `🥇 ${b1} 雷达图`;
+    document.getElementById('radar2-title').textContent = `🥈 ${b2} 雷达图`;
+
+    // 雷达图数据
+    const maxVals = [1, 5, 1, 20000, 1000];
+    const vals1 = [parseFloat(r1['平均情感得分']), parseFloat(r1['平均评分']), parseFloat(r1['正面评论占比']), parseFloat(r1['平均销量']), r1['评论数']];
+    const vals2 = [parseFloat(r2['平均情感得分']), parseFloat(r2['平均评分']), parseFloat(r2['正面评论占比']), parseFloat(r2['平均销量']), r2['评论数']];
+
+    createRadarChart('chart-radar1', [{name: b1, values: vals1}], maxVals);
+    createRadarChart('chart-radar2', [{name: b2, values: vals2}], maxVals);
+
+    // 对比表
+    document.getElementById('compare-table').innerHTML = `
+        <table class="data-table">
+            <tr><th>指标</th><th style="color:#3498db">${b1}</th><th style="color:#e94560">${b2}</th></tr>
+            <tr><td>综合竞争力</td><td>${r1['综合竞争力'].toFixed(3)}</td><td>${r2['综合竞争力'].toFixed(3)}</td></tr>
+            <tr><td>平均情感得分</td><td>${r1['平均情感得分'].toFixed(4)}</td><td>${r2['平均情感得分'].toFixed(4)}</td></tr>
+            <tr><td>正面评论占比</td><td>${(parseFloat(r1['正面评论占比'])*100).toFixed(1)}%</td><td>${(parseFloat(r2['正面评论占比'])*100).toFixed(1)}%</td></tr>
+            <tr><td>平均评分</td><td>${parseFloat(r1['平均评分']).toFixed(2)}</td><td>${parseFloat(r2['平均评分']).toFixed(2)}</td></tr>
+            <tr><td>平均价格</td><td>¥${parseFloat(r1['平均价格']).toFixed(0)}</td><td>¥${parseFloat(r2['平均价格']).toFixed(0)}</td></tr>
+            <tr><td>平均销量</td><td>${parseFloat(r1['平均销量']).toFixed(0)}</td><td>${parseFloat(r2['平均销量']).toFixed(0)}</td></tr>
+            <tr><td>评论数</td><td>${r1['评论数']}</td><td>${r2['评论数']}</td></tr>
+            <tr><td>主流聚类</td><td>聚类${Math.round(r1['主流聚类'])}</td><td>聚类${Math.round(r2['主流聚类'])}</td></tr>
+        </table>`;
+
+    // 关键词
+    document.getElementById('kw1').innerHTML = `<h4 style="color:#3498db;margin-bottom:0.5rem;">${b1} 关键词</h4>` +
+        data.keywords1.map(k => `<span class="tag tag-blue" style="margin:0.15rem;">${k['关键词']}<small>${k['TF-IDF得分'].toFixed(1)}</small></span>`).join(' ');
+    document.getElementById('kw2').innerHTML = `<h4 style="color:#e94560;margin-bottom:0.5rem;">${b2} 关键词</h4>` +
+        data.keywords2.map(k => `<span class="tag tag-red" style="margin:0.15rem;">${k['关键词']}<small>${k['TF-IDF得分'].toFixed(1)}</small></span>`).join(' ');
+}
+</script>
+{% endblock %}

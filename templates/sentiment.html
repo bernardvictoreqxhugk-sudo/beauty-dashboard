@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}情感分析{% endblock %}
+{% block content %}
+
+<div class="page-title">💬 品牌情感分析</div>
+<div class="page-subtitle">SnowNLP情感评分 · 15品牌正/中/负面分布 · 情感vs评分验证</div>
+
+<!-- 双图：排名 + 分布 -->
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">🏆 品牌情感得分排名</div>
+        <div class="panel-body"><div class="chart-container tall" id="chart-rank"></div></div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">📊 正/中/负面评论占比</div>
+        <div class="panel-body"><div class="chart-container tall" id="chart-stacked"></div></div>
+    </div>
+</div>
+
+<!-- 情感vs评分 -->
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">🔍 情感得分 vs 用户评分散点图</div>
+        <div class="panel-body no-padding">
+            <img src="{{ url_for('static', filename='images/sentiment_vs_rating.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">🔥 品牌多维度情感热力图</div>
+        <div class="panel-body no-padding">
+            <img src="{{ url_for('static', filename='images/brand_sentiment_heatmap.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
+        </div>
+    </div>
+</div>
+
+<!-- 数据表格 -->
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">📋 品牌情感数据明细表</div>
+        <div class="panel-body">
+            <input type="text" id="table-search" placeholder="🔍 搜索品牌..." style="background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:0.5rem 1rem;border-radius:6px;margin-bottom:1rem;width:250px;">
+            <div style="overflow-x:auto;">
+                <table class="data-table" id="sentiment-table">
+                    <thead><tr>
+                        <th data-sort="品牌">品牌 ▾</th><th data-sort="平均情感得分">情感得分 ▾</th>
+                        <th data-sort="正面评论占比">正面占比 ▾</th><th data-sort="平均评分">评分 ▾</th>
+                        <th data-sort="评论数">评论数 ▾</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let sentimentData = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const resp = await fetchAPI('/api/sentiment');
+    sentimentData = resp.data;
+
+    // 排名图
+    const brands = sentimentData.map(d => d['品牌']).reverse();
+    const scores = sentimentData.map(d => d['平均情感得分']).reverse();
+    createRankChart('chart-rank', brands, scores, '情感得分');
+
+    // 堆叠柱状图
+    createStackedBar('chart-stacked',
+        sentimentData.map(d => d['品牌']),
+        sentimentData.map(d => parseFloat(d['正面评论占比']) * 100),
+        sentimentData.map(d => parseFloat((d['中性占比'] || 0)) * 100),
+        sentimentData.map(d => parseFloat((d['负面占比'] || 0)) * 100)
+    );
+
+    // 表格
+    renderTable(sentimentData);
+
+    // 搜索
+    document.getElementById('table-search').addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        const filtered = sentimentData.filter(d => d['品牌'].toLowerCase().includes(q));
+        renderTable(filtered);
+    });
+
+    // 排序
+    document.querySelectorAll('#sentiment-table th').forEach(th => {
+        th.addEventListener('click', () => {
+            const key = th.dataset.sort;
+            const asc = th.textContent.includes('▴');
+            sentimentData.sort((a,b) => {
+                const va = parseFloat(a[key]) || 0, vb = parseFloat(b[key]) || 0;
+                return asc ? va - vb : vb - va;
+            });
+            document.querySelectorAll('#sentiment-table th').forEach(h => h.textContent = h.textContent.replace(' ▴','').replace(' ▾','') + ' ▾');
+            th.textContent = th.textContent.replace(' ▾','') + (asc ? ' ▾' : ' ▴');
+            renderTable(sentimentData);
+        });
+    });
+});
+
+function renderTable(data) {
+    const tbody = document.querySelector('#sentiment-table tbody');
+    tbody.innerHTML = data.map(d => `
+        <tr>
+            <td><strong>${d['品牌']}</strong></td>
+            <td class="${d['平均情感得分']>0.95?'green':d['平均情感得分']<0.91?'red':'highlight'}">${d['平均情感得分'].toFixed(4)}</td>
+            <td>${(parseFloat(d['正面评论占比'])*100).toFixed(1)}%</td>
+            <td>${parseFloat(d['平均评分']).toFixed(2)}</td>
+            <td>${d['评论数']}</td>
+        </tr>
+    `).join('');
+}
+</script>
+{% endblock %}

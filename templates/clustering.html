@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}聚类分析{% endblock %}
+{% block content %}
+
+<div class="page-title">🔬 K-Means 聚类分析</div>
+<div class="page-subtitle">综合肘部法则+轮廓系数+CH指数 → 最优K=4 · 市场细分画像</div>
+
+<!-- K值选择图 -->
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">📈 K值选择：三指标综合评估</div>
+        <div class="panel-body no-padding">
+            <img src="{{ url_for('static', filename='images/kmeans_k_selection.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
+        </div>
+    </div>
+</div>
+
+<!-- PCA + t-SNE -->
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">🗺️ PCA降维可视化（品牌名标注）</div>
+        <div class="panel-body no-padding">
+            <img src="{{ url_for('static', filename='images/kmeans_pca_brands.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">🗺️ t-SNE降维可视化（品牌名标注）</div>
+        <div class="panel-body no-padding">
+            <img src="{{ url_for('static', filename='images/kmeans_tsne_brands.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
+        </div>
+    </div>
+</div>
+
+<!-- 聚类特征卡片 -->
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">🎯 四类市场细分特征画像 (K=4)</div>
+        <div class="panel-body">
+            <div class="kpi-row" id="cluster-cards"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 品牌聚类分布热力图 -->
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">📊 品牌×聚类 分布热力图</div>
+        <div class="panel-body"><div class="chart-container tall" id="chart-cluster-heatmap"></div></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const data = await fetchAPI('/api/clustering');
+
+    // 聚类卡片
+    const clusterColors = ['#3498db','#e94560','#f1c40f','#2ecc71'];
+    const clusterIcons = ['🔵','🔴','🟡','🟢'];
+    document.getElementById('cluster-cards').innerHTML = data.clusters.map((c, i) => `
+        <div class="kpi-card" style="border-left: 3px solid ${clusterColors[i]}">
+            <div class="kpi-label">${clusterIcons[i]} 聚类${c.id} — ${c.name}</div>
+            <div class="kpi-value" style="font-size:1.3rem; color:${clusterColors[i]}">${c.count} 款商品</div>
+            <div class="kpi-sub">
+                💰 均价 ¥${c.avg_price} &nbsp;|&nbsp; 📦 均销量 ${c.avg_sales.toLocaleString()}<br>
+                ⭐ 评分 ${c.avg_rating} &nbsp;|&nbsp; 💬 评价 ${c.avg_reviews.toLocaleString()}<br>
+                🏷️ ${c.top_brands}<br>
+                📂 ${c.top_cats}
+            </div>
+        </div>
+    `).join('');
+
+    // 品牌×聚类热力图
+    const clusterBrands = [...new Set(data.brand_cluster.map(d => d.brand))];
+    const clusterLabels = ['聚类0','聚类1','聚类2','聚类3'];
+    const heatData = data.brand_cluster.map(d => [d.cluster, clusterBrands.indexOf(d.brand), d.count]);
+    createHeatmap('chart-cluster-heatmap', clusterLabels, clusterBrands, heatData);
+});
+</script>
+{% endblock %}

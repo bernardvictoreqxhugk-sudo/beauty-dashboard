@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}代码展示{% endblock %}
+{% block content %}
+
+<div class="page-title">💻 代码展示</div>
+<div class="page-subtitle">核心分析脚本一览 · Python数据科学Pipeline</div>
+
+<!-- 代码文件导航 -->
+<div class="tab-bar" id="code-tabs">
+    <button class="tab-btn active" onclick="showCode('brand_analysis', this)">📊 brand_analysis_enhanced.py</button>
+    <button class="tab-btn" onclick="showCode('wordcloud', this)">☁️ wordcloud_gen_quick.py</button>
+    <button class="tab-btn" onclick="showCode('app', this)">🌐 app.py (Flask)</button>
+    <button class="tab-btn" onclick="showCode('dashboard_js', this)">📈 dashboard.js</button>
+</div>
+
+<!-- 代码展示区 -->
+<div id="code-display"></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const codeFiles = {
+    'brand_analysis': {
+        title: 'brand_analysis_enhanced.py — 美妆品牌全流程分析',
+        desc: '核心分析脚本：包含情感分析(SnowNLP)、TF-IDF关键词提取、LDA主题建模、K-Means聚类、分类模型(5种)、回归分析(5种)、品牌仪表板生成。共6大模块，约500行。',
+        code: `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+美妆产品多品牌评论分析 — 增强版
+模块1：品牌情感对比 | 模块2：TF-IDF+LDA | 模块3：K-Means聚类
+模块4：分类模型 | 模块5：回归分析 | 模块6：品牌仪表板
+"""
+import pandas as pd, numpy as np
+from snownlp import SnowNLP
+from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import LatentDirichletAllocation, PCA
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
+from sklearn.metrics import silhouette_score, calinski_harabasz_score
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.manifold import TSNE
+import xgboost as xgb, jieba, matplotlib.pyplot as plt, seaborn as sns
+
+# ============ 模块1：品牌级情感分析 ============
+sentiments = [SnowNLP(str(text)).sentiments for text in merged['评价内容']]
+merged['情感得分'] = sentiments
+merged['情感分类'] = pd.cut(merged['情感得分'], bins=[0,0.3,0.7,1.0],
+                           labels=['负面','中性','正面'])
+
+brand_sentiment = merged.groupby('品牌').agg(
+    平均情感得分=('情感得分','mean'),
+    正面占比=('情感分类', lambda x: (x=='正面').mean()),
+    平均评分=('评分_review','mean')
+).sort_values('平均情感得分', ascending=False)
+
+# ============ 模块2：TF-IDF + LDA 主题建模 ============
+def tokenize(text):
+    words = jieba.lcut(str(text))
+    return [w for w in words if len(w)>=2 and w not in stop_words]
+
+merged['分词_文本'] = merged['评价内容'].apply(tokenize).apply(' '.join)
+
+# TF-IDF 关键词提取
+tfidf = TfidfVectorizer(max_features=100)
+tfidf_matrix = tfidf.fit_transform(merged['分词_文本'])
+
+# LDA 主题建模 (K=6)
+lda = LatentDirichletAllocation(n_components=6, random_state=42)
+lda.fit(CountVectorizer(max_features=2000).fit_transform(merged['分词_文本']))
+
+# ============ 模块3：增强 K-Means 聚类 ============
+cluster_data = products[['价格','销量','评分','评价数']].dropna()
+cluster_scaled = StandardScaler().fit_transform(cluster_data)
+
+# 三指标综合定K (肘部+轮廓系数+CH指数)
+for k in range(2, 9):
+    labels = KMeans(n_clusters=k, n_init=10).fit_predict(cluster_scaled)
+    sil = silhouette_score(cluster_scaled, labels)
+    ch = calinski_harabasz_score(cluster_scaled, labels)
+
+kmeans = KMeans(n_clusters=best_k, n_init=10)
+products['聚类标签'] = kmeans.fit_predict(cluster_scaled)
+
+# PCA + t-SNE 可视化
+pca_2d = PCA(n_components=2).fit_transform(cluster_scaled)
+tsne_2d = TSNE(n_components=2).fit_transform(cluster_scaled)
+
+# ============ 模块4：增强分类模型 ============
+models = {
+    '决策树': DecisionTreeClassifier(max_depth=8),
+    '随机森林': RandomForestClassifier(n_estimators=200, max_depth=12),
+    '梯度提升': GradientBoostingClassifier(n_estimators=150, max_depth=6),
+    'XGBoost': xgb.XGBClassifier(n_estimators=150, max_depth=6),
+    '逻辑回归': LogisticRegression(max_iter=1000),
+}
+for name, model in models.items():
+    model.fit(X_train_scaled, y_train)
+    acc = accuracy_score(y_test, model.predict(X_test_scaled))
+    cv = cross_val_score(model, X_train_scaled, y_train, cv=3).mean()
+
+# ============ 模块5：品牌级回归分析 ============
+reg_models = {
+    '线性回归': LinearRegression(),
+    'Ridge回归': Ridge(alpha=1.0),
+    '随机森林': RandomForestRegressor(n_estimators=200),
+    '梯度提升': GradientBoostingRegressor(n_estimators=150),
+    'XGBoost': xgb.XGBRegressor(n_estimators=150),
+}
+# 品牌特化回归：Top 5 品牌各自建模
+for brand in top5_brands:
+    rf = RandomForestRegressor(n_estimators=100)
+    rf.fit(brand_features, brand_sales)
+    # 对比各品牌销量驱动因素差异
+
+# ============ 模块6：品牌仪表板 ============
+brand_dashboard['综合竞争力'] = (
+    brand_dashboard['平均情感得分_排名分']*0.3 +
+    brand_dashboard['平均评分_排名分']*0.3 +
+    brand_dashboard['正面评论占比_排名分']*0.4
+)
+# 生成: 排名图/雷达图/气泡图/热力图/综合报告`
+    },
+    'wordcloud': {
+        title: 'wordcloud_gen_quick.py — 词云生成脚本',
+        desc: '基于SnowNLP情感分类和Jieba中文分词，生成全量/正面/非正面/品牌词云。使用WordCloud库 + STHeiti中文字体。',
+        code: `#!/usr/bin/env python3
+"""快速词云生成：基于美妆评论情感分析"""
+import pandas as pd, jieba, numpy as np
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt, matplotlib.font_manager as fm
+
+FONT_PATH = '/System/Library/Fonts/STHeiti Medium.ttc'
+FONT_PROP = fm.FontProperties(fname=FONT_PATH, size=20)
+
+def segment(text):
+    words = jieba.lcut(str(text))
+    return [w for w in words
+            if len(w)>=2 and w not in stop_words and not w.isdigit()]
+
+def make_wordcloud(texts, title, filename, colormap='viridis'):
+    all_words = [w for t in texts for w in segment(t)]
+    word_freq = {}
+    for w in all_words:
+        word_freq[w] = word_freq.get(w, 0) + 1
+
+    wc = WordCloud(font_path=FONT_PATH, width=1000, height=700,
+                   background_color='white', max_words=180,
+                   colormap=colormap, collocations=False, scale=1.5)
+    wc.generate_from_frequencies(word_freq)
+
+    fig, ax = plt.subplots(figsize=(12, 9))
+    ax.imshow(wc, interpolation='bilinear'); ax.axis('off')
+    ax.set_title(title, fontproperties=FONT_PROP, fontsize=20,
+                 fontweight='bold', pad=20)
+    plt.savefig(filename, dpi=150, bbox_inches='tight'); plt.close()
+
+# 生成 7 张词云
+make_wordcloud(merged['评价内容'], '美妆评论全词云', 'wordcloud_all.png')
+make_wordcloud(positive, '正面评论词云', 'wordcloud_positive.png', 'Greens')
+make_wordcloud(non_pos, '非正面评论词云', 'wordcloud_negative.png', 'Reds')
+for brand in ['科颜氏','资生堂','自然堂','丸美']:
+    make_wordcloud(merged[merged['品牌']==brand]['评价内容'],
+                   f'{brand} 词云', f'wordcloud_{brand}.png')`
+    },
+    'app': {
+        title: 'app.py — Flask 后端 (路由 + 8个API)',
+        desc: 'Flask全栈Web应用后端。读取CSV数据，提供8个JSON API端点，渲染6个数据页面。',
+        code: `#!/usr/bin/env python3
+"""美妆品牌数据分析仪表板 — Flask 后端"""
+from flask import Flask, render_template, jsonify, request
+import pandas as pd, os
+
+app = Flask(__name__)
+brand_df = pd.read_csv('data/brand_comparison.csv', encoding='utf-8-sig')
+kw_df = pd.read_csv('data/brand_keywords_tfidf.csv', encoding='utf-8-sig')
+
+# ====== 页面路由 ======
+@app.route('/')          # 首页仪表板
+@app.route('/sentiment') # 情感分析
+@app.route('/topics')    # 主题挖掘
+@app.route('/clustering')# 聚类分析
+@app.route('/brands')    # 品牌对比
+@app.route('/models')    # 模型分析
+
+# ====== JSON API (8个端点) ======
+@app.route('/api/overview')  # KPI + Top10排名 + 气泡图数据
+@app.route('/api/sentiment') # 15品牌情感全维度
+@app.route('/api/topics')    # LDA主题 + 品牌关键词(支持?brand=过滤)
+@app.route('/api/clustering')# K-Means聚类特征 + 品牌分布
+@app.route('/api/brands')    # 品牌全量数据(支持?b1=&b2=对比)
+@app.route('/api/brands/compare')
+@app.route('/api/models')    # 分类/回归模型指标
+@app.route('/api/data/files')# 可下载文件列表
+
+# 启动: python app.py → http://localhost:5050`
+    },
+    'dashboard_js': {
+        title: 'dashboard.js — ECharts 交互图表函数库',
+        desc: '前端图表核心库。封装了排名图、气泡图、雷达图、热力图、堆叠柱状图、分组柱状图等ECharts初始化函数，支持暗色主题。',
+        code: `/* 美妆品牌分析仪表板 — ECharts 图表函数库 */
+
+// 品牌颜色映射 (15个品牌固定颜色)
+const BRAND_COLORS = [
+    '#e94560','#3498db','#2ecc71','#f1c40f','#9b59b6',
+    '#1abc9c','#e67e22','#e74c3c','#2980b9','#27ae60',
+    '#f39c12','#8e44ad','#16a085','#d35400','#c0392b'
+];
+
+// 横向柱状图 (品牌排名)
+function createRankChart(domId, categories, values) {
+    const chart = echarts.init(document.getElementById(domId));
+    chart.setOption({
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'value' },
+        yAxis: { type: 'category', data: categories.reverse() },
+        series: [{ type: 'bar', data: ... }]
+    });
+}
+
+// 气泡图 (散点图)
+function createBubbleChart(domId, data, xKey, yKey, sizeKey, colorKey) { }
+
+// 雷达图 (双品牌对比)
+function createRadarChart(domId, brandData, maxValues) { }
+
+// 热力图 (品牌×维度矩阵)
+function createHeatmap(domId, xLabels, yLabels, data) { }
+
+// 堆叠柱状图 (正/中/负面占比)
+function createStackedBar(domId, categories, pos, neu, neg) { }
+
+// 分组柱状图 (模型对比)
+function createGroupedBar(domId, categories, seriesData) { }
+
+// 通用API请求封装
+async function fetchAPI(endpoint) {
+    return (await fetch(endpoint)).json();
+}`
+    },
+};
+
+function showCode(key, btn) {
+    document.querySelectorAll('#code-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const f = codeFiles[key];
+    const display = document.getElementById('code-display');
+    display.innerHTML = `
+        <div class="panel" style="margin-top:1rem;">
+            <div class="panel-header">
+                <span>${f.title}</span>
+                <span style="font-size:0.8rem;color:var(--text-muted);">${f.code.split('\\n').length} 行</span>
+            </div>
+            <div class="panel-body">
+                <p style="color:var(--text-secondary);margin-bottom:1rem;">${f.desc}</p>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>📄 ${key}.py</span>
+                        <span class="lang-tag">Python</span>
+                    </div>
+                    <pre><code>${escapeHtml(f.code)}</code></pre>
+                </div>
+            </div>
+        </div>`;
+}
+
+function escapeHtml(text) {
+    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// 默认显示第一个
+document.addEventListener('DOMContentLoaded', () => showCode('brand_analysis', document.querySelector('#code-tabs .tab-btn')));
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}美妆品牌分析{% endblock %} — 数据仪表板</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">✨ 美妆<span>品牌分析</span></a>
+        <button class="hamburger" onclick="toggleMenu()" aria-label="菜单">☰</button>
+        <ul class="navbar-nav">
+            <li><a href="/" class="{% if active_page == 'index' %}active{% endif %}">📊 首页</a></li>
+            <li><a href="/sentiment" class="{% if active_page == 'sentiment' %}active{% endif %}">💬 情感分析</a></li>
+            <li><a href="/topics" class="{% if active_page == 'topics' %}active{% endif %}">📝 主题挖掘</a></li>
+            <li><a href="/clustering" class="{% if active_page == 'clustering' %}active{% endif %}">🔬 聚类分析</a></li>
+            <li><a href="/brands" class="{% if active_page == 'brands' %}active{% endif %}">🏷️ 品牌对比</a></li>
+            <li><a href="/models" class="{% if active_page == 'models' %}active{% endif %}">🤖 模型分析</a></li>
+            <li><a href="/code" class="{% if active_page == 'code' %}active{% endif %}">💻 代码展示</a></li>
+        </ul>
+        <div class="navbar-right">
+            <span>15品牌 · 221商品 · 7,517评论</span>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- 页脚 -->
+    <div class="footer">
+        <p>美妆产品多品牌数据分析仪表板 · Python Flask + ECharts · 基于天猫美妆评论数据</p>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
