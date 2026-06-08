@@ -12,15 +12,19 @@
         <div class="panel-body"><div class="chart-container tall" id="chart-classification"></div></div>
     </div>
     <div class="panel">
-        <div class="panel-header">🖼️ 分类模型对比柱状图 (PNG)</div>
-        <div class="panel-body no-padding">
-            <img src="{{ url_for('static', filename='images/classification_models_comparison.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
-        </div>
-    </div>
-    <div class="panel">
         <div class="panel-header">📋 混淆矩阵（最佳模型: 逻辑回归）</div>
         <div class="panel-body no-padding">
             <img src="{{ url_for('static', filename='images/classification_confusion_matrix.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
+        </div>
+    </div>
+</div>
+
+<div class="grid-full">
+    <div class="panel">
+        <div class="panel-header">🖼️ 分类模型 & 回归模型 对比柱状图 (PNG)</div>
+        <div class="panel-body" style="display:flex; gap:1.5rem; justify-content:center;">
+            <img src="{{ url_for('static', filename='images/classification_models_comparison.png') }}" style="width:48%; border-radius:6px;">
+            <img src="{{ url_for('static', filename='images/regression_models_comparison.png') }}" style="width:48%; border-radius:6px;">
         </div>
     </div>
 </div>
@@ -30,12 +34,6 @@
     <div class="panel">
         <div class="panel-header">📈 回归模型性能对比（R² / RMSE / MAE）</div>
         <div class="panel-body"><div class="chart-container tall" id="chart-regression"></div></div>
-    </div>
-    <div class="panel">
-        <div class="panel-header">🖼️ 回归模型对比图 (PNG)</div>
-        <div class="panel-body no-padding">
-            <img src="{{ url_for('static', filename='images/regression_models_comparison.png') }}" style="width:100%; border-radius:0 0 10px 10px;">
-        </div>
     </div>
     <div class="panel">
         <div class="panel-header">📊 回归模型指标明细</div>
